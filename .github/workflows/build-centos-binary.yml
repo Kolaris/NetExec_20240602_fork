@@ -27,8 +27,7 @@ jobs:
 
       - name: Install Tools & Dependencies
         run: |
-          # 🔥 确保在代码根目录下安装依赖
-          cd ${{ github.workspace }}
+          # 不需要 cd，默认就在代码根目录下
           python3 -m pip install --upgrade pip setuptools wheel
           python3 -m pip install poetry pyinstaller
           poetry config virtualenvs.create false
@@ -36,9 +35,7 @@ jobs:
 
       - name: Execute PyInstaller Packing
         run: |
-          # 🔥 核心修正：先进入代码克隆的绝对路径，再执行打包
-          cd ${{ github.workspace }}
-          
+          # 拒绝绝对路径，直接在当前目录开干
           pyinstaller --clean \
             --onefile \
             --name nxc_centos \
@@ -51,4 +48,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: netexec-centos-amd64-binary
-          path: ${{ github.workspace }}/dist/nxc_centos
+          path: dist/nxc_centos
