@@ -1,4 +1,4 @@
-name: Build Binaries
+name: Build CentOS Binaries
 
 on:
   workflow_dispatch:
