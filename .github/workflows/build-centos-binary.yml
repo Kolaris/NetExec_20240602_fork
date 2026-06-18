@@ -1,29 +1,42 @@
-name: Build CentOS Binaries
+name: Build Binaries
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    name: Building Binary on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Building Binary on ${{ matrix.job_name }}
+    # 🔥 核心修正 1：如果名字是 centos，宿主机强制分分配 ubuntu-latest，否则按原样分配
+    runs-on: ${{ matrix.os == 'centos-high-compat' && 'ubuntu-latest' || matrix.os }}
     strategy:
       matrix:
-        # 🔥 核心修改：在原本的系统列表里，加入我们自定义的 'centos-high-compat'
+        # 这里保留你喜欢的名字，用来在界面上做区分
         os: [ubuntu-latest, centos-high-compat, macOS-latest, macos-26-intel, windows-latest]
         python-version: ["3.13"]
+        include:
+          # 🔥 核心修正 2：为每个系统定义一个好看的展示名字
+          - os: ubuntu-latest
+            job_name: ubuntu-latest
+          - os: centos-high-compat
+            job_name: centos-high-compat
+          - os: macOS-latest
+            job_name: macOS-latest
+          - os: macos-26-intel
+            job_name: macos-26-intel
+          - os: windows-latest
+            job_name: windows-latest
 
     steps:
     - uses: actions/checkout@v4
 
-    # 只有不是 centos 编译时，才使用官方原生的 setup-python（因为 centos 我们在容器里自己搞）
+    # 只有不是 centos 编译时，才使用官方原生的 setup-python
     - name: NetExec set up python on ${{ matrix.os }}
       if: matrix.os != 'centos-high-compat'
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
-    # 1. 官方原生的打包逻辑（保持一字未动）
+    # 1. 官方原生的打包逻辑
     - name: Build Native Binary
       if: matrix.os != 'centos-high-compat'
       run: |
@@ -31,28 +44,17 @@ jobs:
         pip install .
         pyinstaller netexec.spec
 
-    # 2. 🔥 专属 CentOS 的编译逻辑：利用宿主机的 Docker，把 checkout 好的代码挂载进 Manylinux 容器中打包
+    # 2. 专属 CentOS 的编译逻辑
     - name: Build High-Compatibility Binary for CentOS
       if: matrix.os == 'centos-high-compat'
       run: |
         docker run --rm -v ${{ github.workspace }}:/src -w /src quay.io/pypa/manylinux_2_28_x86_64 bash -c "
-          echo '=== 1. 切换到容器自带的 Python 3.11 环境 ===' &&
           export PATH=/opt/python/cp311-cp311/bin:\$PATH &&
-          
-          echo '=== 2. 安装底层安全依赖库 ===' &&
           dnf install -y openssl-devel libffi-devel krb5-devel gcc &&
-          
-          echo '=== 3. 升级并安装打包工具 ===' &&
           pip install --upgrade pip setuptools wheel &&
           pip install pyinstaller pillow &&
-          
-          echo '=== 4. 安装 NetExec 及其依赖包 ===' &&
           pip install . &&
-          
-          echo '=== 5. 严格按照官方 spec 配置文件压制二进制 ===' &&
           pyinstaller netexec.spec &&
-          
-          echo '=== 6. 修改产物权限，确保宿主机可读 ===' &&
           chmod -R 777 dist/
         "
 
@@ -63,7 +65,7 @@ jobs:
         name: nxc-windows.exe
         path: dist/nxc.exe
 
-    # 3. 🔥 修改上传逻辑：非 Windows 系统上传，同时兼容我们新加的 CentOS 产物
+    # 3. 非 Windows 系统上传，同时兼容我们新加的 CentOS 产物
     - name: Upload Nix/OSx Binary
       if: matrix.os != 'windows-latest'
       uses: actions/upload-artifact@v4
