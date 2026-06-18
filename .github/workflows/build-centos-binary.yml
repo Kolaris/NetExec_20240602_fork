@@ -1,4 +1,4 @@
-name: Build  C Binaries
+name: Build C Binaries
 
 on:
   workflow_dispatch:
@@ -40,7 +40,7 @@ jobs:
         pip install .
         pyinstaller netexec.spec
 
-    # 2. 🔥 专属 CentOS 的编译逻辑（强行切换至纯正系统级 Python 3.11）
+    # 2. 🔥 专属 CentOS 的编译逻辑（修正 DNF 包名为 python3.11-devel）
     - name: Build High-Compatibility Binary for CentOS
       if: matrix.os == 'centos-high-compat'
       run: |
@@ -49,7 +49,7 @@ jobs:
           git config --global --add safe.directory /src &&
           
           echo '=== 1. 显式安装带有完整共享库的系统级 Python 3.11 运行与开发环境 ===' &&
-          dnf install -y python311-devel python311-pip openssl-devel libffi-devel krb5-devel gcc &&
+          dnf install -y python3.11-devel python3.11-pip openssl-devel libffi-devel krb5-devel gcc &&
           
           echo '=== 2. 升级系统 pip3.11 并安装打包工具 ===' &&
           python3.11 -m pip install --upgrade pip setuptools wheel &&
