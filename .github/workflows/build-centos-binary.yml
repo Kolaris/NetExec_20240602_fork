@@ -1,4 +1,4 @@
-name: Build C Binaries
+name: Build Binaries CV
 
 on:
   workflow_dispatch:
@@ -40,7 +40,7 @@ jobs:
         pip install .
         pyinstaller netexec.spec
 
-    # 2. 🔥 专属 CentOS 的编译逻辑（锁死 pyinstaller 执行路径）
+    # 2. 🔥 专属 CentOS 的编译逻辑（利用 Python 内部大写模块名进行绝杀）
     - name: Build High-Compatibility Binary for CentOS
       if: matrix.os == 'centos-high-compat'
       run: |
@@ -58,8 +58,9 @@ jobs:
           echo '=== 3. 安装 NetExec 及其所有现代依赖包 ===' &&
           /usr/bin/python3.11 -m pip install . &&
           
-          echo '=== 4. 绕过环境重定向，直接用绝对路径的 pyinstaller 压制 ===' &&
-          /usr/bin/pyinstaller netexec.spec &&
+          echo '=== 4. 动态侦测路径并使用大写模块名双保险打包 ===' &&
+          echo 'PyInstaller 实际安装位置：' && which pyinstaller || true &&
+          /usr/bin/python3.11 -m PyInstaller netexec.spec &&
           
           echo '=== 5. 修改产物权限，确保宿主机可读 ===' &&
           chmod -R 777 dist/
