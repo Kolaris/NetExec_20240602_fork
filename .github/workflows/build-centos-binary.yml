@@ -40,7 +40,7 @@ jobs:
         pip install .
         pyinstaller netexec.spec
 
-    # 2. 🔥 专属 CentOS 的编译逻辑（已打上 Git 信任补丁）
+    # 2. 🔥 专属 CentOS 的编译逻辑（使用自带独立共享库的系统 Python）
     - name: Build High-Compatibility Binary for CentOS
       if: matrix.os == 'centos-high-compat'
       run: |
@@ -48,23 +48,20 @@ jobs:
           echo '=== 0. 解除 Git 容器挂载目录所有权限制 ===' &&
           git config --global --add safe.directory /src &&
           
-          echo '=== 1. 切换到容器自带的 Python 3.11 环境 ===' &&
-          export PATH=/opt/python/cp311-cp311/bin:\$PATH &&
+          echo '=== 1. 使用 dnf 安装系统级带共享库的 Python3 ===' &&
+          dnf install -y python3-devel python3-pip openssl-devel libffi-devel krb5-devel gcc &&
           
-          echo '=== 2. 安装底层安全依赖库 ===' &&
-          dnf install -y openssl-devel libffi-devel krb5-devel gcc &&
+          echo '=== 2. 升级系统 pip 并安装打包工具 ===' &&
+          python3 -m pip install --upgrade pip setuptools wheel &&
+          python3 -m pip install pyinstaller pillow &&
           
-          echo '=== 3. 升级并安装打包工具 ===' &&
-          pip install --upgrade pip setuptools wheel &&
-          pip install pyinstaller pillow &&
+          echo '=== 3. 安装 NetExec 及其依赖包 ===' &&
+          python3 -m pip install . &&
           
-          echo '=== 4. 安装 NetExec 及其依赖包 ===' &&
-          pip install . &&
+          echo '=== 4. 严格按照官方 spec 配置文件压制二进制 ===' &&
+          python3 -m pyinstaller netexec.spec &&
           
-          echo '=== 5. 严格按照官方 spec 配置文件压制二进制 ===' &&
-          pyinstaller netexec.spec &&
-          
-          echo '=== 6. 修改产物权限，确保宿主机可读 ===' &&
+          echo '=== 5. 修改产物权限，确保宿主机可读 ===' &&
           chmod -R 777 dist/
         "
 
