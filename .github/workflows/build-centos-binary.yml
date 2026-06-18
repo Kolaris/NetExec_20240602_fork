@@ -1,0 +1,53 @@
+name: Build CentOS High-Compatibility Binary
+
+on:
+  workflow_dispatch: # 支持在 GitHub Actions 界面手动一键触发
+
+jobs:
+  build-centos:
+    name: Build in Manylinux (CentOS) Environment
+    runs-on: ubuntu-latest
+    
+    # 🔥 核心黑科技：强行让整个构建生命周期都在这个专为老旧 glibc (CentOS 7+) 打造的容器中运行
+    container:
+      image: quay.io/pypa/manylinux2014_x86_64
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Manylinux 容器默认带有很多版本的 Python，我们强制切到一个标准现代版本（如 3.11）
+      - name: Setup Build Environment Variables
+        run: |
+          echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
+          echo "PATH=/opt/python/cp311-cp311/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Install System Dependencies
+        run: |
+          # Manylinux 基于 CentOS，使用 yum/dnf 管理底层网络/加密依赖
+          yum install -y openssl-devel libffi-devel krb5-devel
+
+      - name: Install Tools & Dependencies
+        run: |
+          python3 -m pip install --upgrade pip setuptools wheel
+          python3 -m pip install poetry pyinstaller
+          # 让 poetry 摆脱虚拟环境，直接把依赖灌入容器的全局 site-packages
+          poetry config virtualenvs.create false
+          poetry install --no-root --without dev
+
+      - name: Execute PyInstaller Packing
+        run: |
+          # 使用 PyInstaller 压制单文件，并强制灌入 NetExec 的资产数据和协议目录
+          pyinstaller --clean \
+            --onefile \
+            --name nxc_centos \
+            --add-data "data:data" \
+            --add-data "protocols:protocols" \
+            --add-data "modules:modules" \
+            netexec.py
+
+      - name: Upload Finished Artifact
+        uses: actions/artifacts/upload-artifact@v4
+        with:
+          name: netexec-centos-amd64-binary
+          path: dist/nxc_centos
