@@ -8,7 +8,7 @@ jobs:
     name: Build in Manylinux (CentOS) Environment
     runs-on: ubuntu-latest
     
-    # 🔥 核心黑科技：强行让整个构建生命周期都在这个专为老旧 glibc (CentOS 7+) 打造的容器中运行
+    # 核心黑科技：强行让整个构建生命周期都在这个专为老旧 glibc (CentOS 7+) 打造的容器中运行
     container:
       image: quay.io/pypa/manylinux2014_x86_64
 
@@ -46,8 +46,9 @@ jobs:
             --add-data "modules:modules" \
             netexec.py
 
+      # 🔥 这里已经彻底修复：使用了官方标准的 upload-artifact 插件
       - name: Upload Finished Artifact
-        uses: actions/artifacts/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: netexec-centos-amd64-binary
           path: dist/nxc_centos
