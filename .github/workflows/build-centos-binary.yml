@@ -1,22 +1,22 @@
 name: Build CentOS High-Compatibility Binary
 
 on:
-  workflow_dispatch: # 支持在 GitHub Actions 界面手动一键触发
+  workflow_dispatch: # 支持手动一键触发
 
 jobs:
   build-centos:
-    name: Build in Manylinux (CentOS) Environment
+    name: Build in Manylinux (CentOS Stream/AlmaLinux) Environment
     runs-on: ubuntu-latest
     
-    # 核心黑科技：强行让整个构建生命周期都在这个专为老旧 glibc (CentOS 7+) 打造的容器中运行
+    # 🔥 升级为现代高兼容性 manylinux 镜像，彻底避开老旧系统调用被宿主机内核掐死的巨坑
     container:
-      image: quay.io/pypa/manylinux2014_x86_64
+      image: quay.io/pypa/manylinux_2_28_x86_64
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Manylinux 容器默认带有很多版本的 Python，我们强制切到一个标准现代版本（如 3.11）
+      # 强制切到镜像内自带的现代稳定 Python 环境
       - name: Setup Build Environment Variables
         run: |
           echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
@@ -24,20 +24,19 @@ jobs:
 
       - name: Install System Dependencies
         run: |
-          # Manylinux 基于 CentOS，使用 yum/dnf 管理底层网络/加密依赖
-          yum install -y openssl-devel libffi-devel krb5-devel
+          # 现代镜像使用 dnf 替代 yum，安装底层网络与安全加密协议库
+          dnf install -y openssl-devel libffi-devel krb5-devel gcc
 
       - name: Install Tools & Dependencies
         run: |
           python3 -m pip install --upgrade pip setuptools wheel
           python3 -m pip install poetry pyinstaller
-          # 让 poetry 摆脱虚拟环境，直接把依赖灌入容器的全局 site-packages
           poetry config virtualenvs.create false
           poetry install --no-root --without dev
 
       - name: Execute PyInstaller Packing
         run: |
-          # 使用 PyInstaller 压制单文件，并强制灌入 NetExec 的资产数据和协议目录
+          # 使用 PyInstaller 压制单文件，并强行捕获可能的底层错误
           pyinstaller --clean \
             --onefile \
             --name nxc_centos \
@@ -46,7 +45,6 @@ jobs:
             --add-data "modules:modules" \
             netexec.py
 
-      # 🔥 这里已经彻底修复：使用了官方标准的 upload-artifact 插件
       - name: Upload Finished Artifact
         uses: actions/upload-artifact@v4
         with:
