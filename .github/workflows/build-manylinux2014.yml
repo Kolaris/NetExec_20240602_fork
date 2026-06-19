@@ -1,12 +1,12 @@
-name: Build CentOS 7 ManyLinux High-Compatibility Binary
+name: Build ManyLinux2014 High-Compatibility Binary
 
 on:
-  workflow_dispatch: # 支持手动点击按钮触发编译
+  workflow_dispatch:
 
 jobs:
   build-centos:
     name: Build Binary for CentOS 7+ (GLIBC 2.17)
-    runs-on: ubuntu-latest # 使用标准的 Ubuntu 宿主机提供算力
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Source Code
@@ -18,20 +18,24 @@ jobs:
           echo '=== 0. 解除 Git 容器挂载目录所有权限制 ===' &&
           git config --global --add safe.directory /src &&
           
-          echo '=== 1. 使用 yum 安装 CentOS 7 兼容的底层开发工具 ===' &&
+          echo '=== 1. 安装底层开发工具 ===' &&
           yum install -y openssl-devel libffi-devel krb5-devel gcc python3-devel &&
           
-          echo '=== 2. 使用 manylinux2014 内部自带的独立现代 Python 3.10 环境 ===' &&
+          echo '=== 2. 使用 cp310 环境并强行补齐动态链接库搜索路径 ===' &&
+          export LD_LIBRARY_PATH=/opt/python/cp310-cp310/lib:\$LD_LIBRARY_PATH &&
           /opt/python/cp310-cp310/bin/python -m pip install --upgrade pip setuptools wheel &&
           /opt/python/cp310-cp310/bin/python -m pip install pyinstaller pillow &&
           
           echo '=== 3. 安装 NetExec 及其所有依赖包 ===' &&
           /opt/python/cp310-cp310/bin/python -m pip install . &&
           
-          echo '=== 4. 严格按照 spec 配置文件，通过大写模块名进行压制 ===' &&
-          /opt/python/cp310-cp310/bin/python -m PyInstaller netexec.spec &&
+          echo '=== 4. 强行开启 PyInstaller 静态兼容模式压制 ===' &&
+          /opt/python/cp310-cp310/bin/python -m PyInstaller netexec.spec --add-binary '/opt/python/cp310-cp310/bin/python:.' || {
+            echo '⚡ [备用方案] 如果 spec 锁死静态库，尝试不带 spec 裸包压制'
+            /opt/python/cp310-cp310/bin/pyinstaller --onefile nxc/cli.py --name nxc
+          } &&
           
-          echo '=== 5. 修改产物权限，确保宿主机可读 ===' &&
+          echo '=== 5. 修改产物权限 ===' &&
           chmod -R 777 dist/
         "
 
@@ -39,4 +43,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: nxc-centos-compat
-        path: dist/nxc
+        path: dist/
