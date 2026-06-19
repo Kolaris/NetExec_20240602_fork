@@ -1,4 +1,4 @@
-name: Build CentOS ManyLinux2014 High-Compatibility Binary
+name: Build MANYLINUX High-Compatibility Binary
 
 on:
   workflow_dispatch:
@@ -30,20 +30,24 @@ jobs:
           make -j\$(nproc) &&
           make altinstall &&
           
-          echo '=== 3. 配置刚编译出的动态共享库路径 ===' &&
+          echo '=== 3. 💥 核心一步：强行嫁接官方自带的 SSL 动态库组件 ===' &&
+          cp -f /opt/python/cp310-cp310/lib/python3.10/lib-dynload/_ssl*.so /usr/local/lib/python3.10/lib-dynload/ &&
+          cp -f /opt/python/cp310-cp310/lib/python3.10/lib-dynload/_hashlib*.so /usr/local/lib/python3.10/lib-dynload/ &&
+          
+          echo '=== 4. 配置动态共享库路径 ===' &&
           echo '/usr/local/lib' > /etc/ld.so.conf.d/local.conf &&
           ldconfig &&
           
-          echo '=== 4. 使用全新健全的 Python 3.10 环境安装依赖 ===' &&
+          echo '=== 5. 使用全新健全的 Python 3.10 环境安装依赖 ===' &&
           cd /src &&
           /usr/local/bin/python3.10 -m pip install --upgrade pip setuptools wheel &&
           /usr/local/bin/python3.10 -m pip install pyinstaller pillow &&
           /usr/local/bin/python3.10 -m pip install . &&
           
-          echo '=== 5. 严格按照原厂 spec 配置文件压制二进制 ===' &&
+          echo '=== 6. 严格按照原厂 spec 配置文件压制二进制 ===' &&
           /usr/local/bin/python3.10 -m PyInstaller netexec.spec &&
           
-          echo '=== 6. 修改产物权限 ===' &&
+          echo '=== 7. 修改产物权限 ===' &&
           chmod -R 777 dist/
         "
 
