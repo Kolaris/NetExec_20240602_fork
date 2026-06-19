@@ -1,4 +1,4 @@
-name: Build ManyLinux2014 High-Compatibility Binary
+name: Build CentOS ManyLinux2014 High-Compatibility Binary
 
 on:
   workflow_dispatch:
@@ -18,24 +18,32 @@ jobs:
           echo '=== 0. 解除 Git 容器挂载目录所有权限制 ===' &&
           git config --global --add safe.directory /src &&
           
-          echo '=== 1. 安装底层开发工具 ===' &&
-          yum install -y openssl-devel libffi-devel krb5-devel gcc python3-devel &&
+          echo '=== 1. 安装全套底层编译依赖工具 ===' &&
+          yum install -y openssl-devel libffi-devel krb5-devel gcc make wget zlib-devel bzip2-devel readline-devel sqlite-devel xz-devel &&
           
-          echo '=== 2. 使用 cp310 环境并强行补齐动态链接库搜索路径 ===' &&
-          export LD_LIBRARY_PATH=/opt/python/cp310-cp310/lib:\$LD_LIBRARY_PATH &&
-          /opt/python/cp310-cp310/bin/python -m pip install --upgrade pip setuptools wheel &&
-          /opt/python/cp310-cp310/bin/python -m pip install pyinstaller pillow &&
+          echo '=== 2. 下载并现场编译带有 --enable-shared 的完整版 Python 3.10 ===' &&
+          cd /tmp &&
+          wget https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tgz &&
+          tar -xzf Python-3.10.14.tgz &&
+          cd Python-3.10.14 &&
+          ./configure --enable-shared --prefix=/usr/local &&
+          make -j\$(nproc) &&
+          make altinstall &&
           
-          echo '=== 3. 安装 NetExec 及其所有依赖包 ===' &&
-          /opt/python/cp310-cp310/bin/python -m pip install . &&
+          echo '=== 3. 配置刚编译出的动态共享库路径 ===' &&
+          echo '/usr/local/lib' > /etc/ld.so.conf.d/local.conf &&
+          ldconfig &&
           
-          echo '=== 4. 强行开启 PyInstaller 静态兼容模式压制 ===' &&
-          /opt/python/cp310-cp310/bin/python -m PyInstaller netexec.spec --add-binary '/opt/python/cp310-cp310/bin/python:.' || {
-            echo '⚡ [备用方案] 如果 spec 锁死静态库，尝试不带 spec 裸包压制'
-            /opt/python/cp310-cp310/bin/pyinstaller --onefile nxc/cli.py --name nxc
-          } &&
+          echo '=== 4. 使用全新健全的 Python 3.10 环境安装依赖 ===' &&
+          cd /src &&
+          /usr/local/bin/python3.10 -m pip install --upgrade pip setuptools wheel &&
+          /usr/local/bin/python3.10 -m pip install pyinstaller pillow &&
+          /usr/local/bin/python3.10 -m pip install . &&
           
-          echo '=== 5. 修改产物权限 ===' &&
+          echo '=== 5. 严格按照原厂 spec 配置文件压制二进制 ===' &&
+          /usr/local/bin/python3.10 -m PyInstaller netexec.spec &&
+          
+          echo '=== 6. 修改产物权限 ===' &&
           chmod -R 777 dist/
         "
 
@@ -43,4 +51,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: nxc-centos-compat
-        path: dist/
+        path: dist/nxc
